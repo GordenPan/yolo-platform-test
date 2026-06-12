@@ -25,6 +25,9 @@ scripts/*.zip
 *.cache
 labels.cache
 
+# 工作筆記（含本機私人路徑，不上 GitHub）
+CLAUDE.md
+
 # IDE / OS
 .vscode/
 .idea/
