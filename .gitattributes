@@ -1,0 +1,12 @@
+# 預設自動處理行尾
+* text=auto
+
+# Windows 批次檔必須維持 CRLF（LF 會讓 goto 標籤跳轉失效）
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二進位檔案
+*.pt binary
+*.png binary
+*.jpg binary
+*.zip binary

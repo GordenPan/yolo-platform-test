@@ -1,0 +1,9 @@
+ultralytics>=8.3.0
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+streamlit>=1.35
+requests>=2.31
+pandas>=2.0
+opencv-python>=4.9
+pyyaml>=6.0

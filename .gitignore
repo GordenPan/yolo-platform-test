@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# 使用者資料：資料集、訓練輸出、難例集中區（只保留目錄結構）
+datasets/*
+!datasets/.gitkeep
+runs/*
+!runs/.gitkeep
+need_to_train/*
+!need_to_train/.gitkeep
+
+# 模型權重（預訓練自動下載；YOLOV26 只保留說明文件）
+*.pt
+models/pretrained/*
+!models/pretrained/.gitkeep
+models/YOLOV26/*
+!models/YOLOV26/README.md
+
+# 測試產物與快取
+scripts/*.zip
+*.cache
+labels.cache
+
+# IDE / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
