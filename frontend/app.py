@@ -410,6 +410,13 @@ elif page == "📈 訓練監控":
     elif task["status"] == "interrupted":
         st.warning("此任務在後端重啟前還在執行，已標記為中斷。若有產生權重仍可在 runs/ 找到。")
 
+    # 訓練完成通知：每個任務只慶祝一次（避免每次重新整理都跳）
+    celebrated = st.session_state.setdefault("celebrated_tasks", set())
+    if task["status"] == "completed" and task["id"] not in celebrated:
+        celebrated.add(task["id"])
+        st.toast(f"🎉 訓練完成：{task['id']}", icon="✅")
+        st.balloons()
+
     if auto and is_active:
         time.sleep(5)
         st.rerun()
