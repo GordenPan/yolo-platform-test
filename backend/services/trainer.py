@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import csv
 import json
+import shutil
 import threading
 import time
 import traceback
@@ -147,6 +148,28 @@ def resume_training(task_id: str) -> str:
 def get_task(task_id: str) -> dict | None:
     task = _tasks.get(task_id)
     return task.to_dict() if task else None
+
+
+def delete_task(task_id: str) -> bool:
+    """刪除一筆訓練任務紀錄：移除記憶體任務 + .tasks json + 其 run 資料夾
+    （若在 RUNS_DIR 內）。連 run 一起刪是為了避免重啟後又被掃描合成回來。
+    進行中的任務不可刪——請先取消。"""
+    task = _tasks.get(task_id)
+    if task and task.status in _ACTIVE:
+        raise ValueError("任務進行中，請先取消再刪除")
+    _tasks.pop(task_id, None)
+    try:
+        (TASKS_DIR / f"{task_id}.json").unlink(missing_ok=True)
+    except OSError:
+        pass
+    if task and task.run_dir:
+        try:
+            rd = Path(task.run_dir).resolve()
+            if RUNS_DIR.resolve() in rd.parents:
+                shutil.rmtree(rd, ignore_errors=True)
+        except OSError:
+            pass
+    return task is not None
 
 
 def purge_run(run_name: str) -> None:

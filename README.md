@@ -1,6 +1,8 @@
 # YOLO Platform — 一站式 YOLO 訓練與測試平台
 
-前後端分離架構：**FastAPI**（核心後端，調用 `ultralytics` 執行 YOLOv11）+ **Streamlit**（操作介面，透過 REST API 與後端溝通）。
+*繁體中文 | [English](README.en.md)*
+
+前後端分離架構：**FastAPI**（核心後端，調用 `ultralytics` 執行 YOLOv11/YOLOv26）+ **Streamlit**（操作介面，透過 REST API 與後端溝通）。
 
 > ⚠️ **安全警告：僅限本機單人使用**
 >
@@ -55,10 +57,12 @@ yolo-platform/
 ├── models/
 │   ├── pretrained/          # yolo11n/s/m/l/x.pt（首次使用自動下載）
 │   └── YOLOV26/             # ★ 預留：Ultralytics YOLOv26 發布後放入 yolo26*.pt 即自動出現在介面
-├── datasets/                # 資料集（上傳 zip 自動解壓，需含 data.yaml）
+├── datasets/                # 已註冊資料集（只存 data.yaml，影像留在原處）
 ├── runs/                    # 訓練輸出（weights/best.pt、results.csv、曲線圖）
+├── docs/manual.md           # 圖文使用手冊
+├── start.bat / install.bat  # 一鍵啟動 / 安裝（Windows）
 ├── requirements.txt
-└── README.md
+└── README.md / README.en.md
 ```
 
 ## 安裝與啟動
@@ -77,16 +81,16 @@ streamlit run frontend/app.py
 
 ## 資料集格式
 
-上傳的 zip 需為標準 ultralytics 格式，內含 `data.yaml`：
+直接指定本機**資料夾**（不上傳、不複製影像，`data.yaml` 只會指向它）。標準 ultralytics 結構可直接用：
 
 ```
-my_dataset.zip
-├── data.yaml        # 含 train/val 路徑、nc、names
-├── images/train/  images/val/
-└── labels/train/  labels/val/
+my_dataset/
+├── data.yaml        # train/val 路徑、nc、names（可省略，平台會自動產生）
+├── images/          # 或 images/train + images/val
+└── labels/          # YOLO .txt 標註，檔名與影像同名
 ```
 
-後端解壓後會自動把 `data.yaml` 的 `path` 改寫為絕對路徑。
+若沒有 `data.yaml`，平台會自動產生並讓你選 train/val 切分方式（隨機自動切分，或 train=val 同一資料夾）；類別數會從標註推斷，名稱可自行覆寫。
 
 ## 主要功能
 
@@ -105,12 +109,13 @@ my_dataset.zip
 
 YOLOv26 同為 Ultralytics 官方模型，`YOLO()` 可原生載入，**接入不需改任何程式碼**：
 
-1. 升級套件：`pip install -U ultralytics`
-2. 將 `yolo26n.pt` 等權重（或 `.yaml` 架構設定）放入 `models/YOLOV26/`
-3. 模型註冊中心會自動掃描，前端「訓練」與「推論」選單即出現 `YOLOV26/...` 選項
+- `yolo26n/s/m/l/x.pt` 已列入自動下載的預訓練清單，會出現在模型選單的「官方預訓練」，
+  首次使用自動下載（需 `ultralytics >= 8.4`）。
+- 也可把自訂的 `yolo26*.pt`（或 `.yaml` 架構設定）放入 `models/YOLOV26/`，
+  註冊中心會自動掃描，前端「訓練」與「推論」選單即出現對應選項。
 
-若要讓 YOLOv26 支援首次使用自動下載，把檔名加入
-`backend/core/config.py` 的 `PRETRAINED_MODELS` 清單即可。
+若安裝的 `ultralytics` 版本太舊無法解析 YOLOv26 架構，訓練會失敗並顯示提示，
+建議執行 `pip install -U ultralytics`。
 
 ## 授權（License）
 

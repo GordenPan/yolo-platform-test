@@ -14,7 +14,7 @@ import streamlit as st
 
 API = os.environ.get("YOLO_API_URL", "http://127.0.0.1:8000")
 
-st.set_page_config(page_title="YOLO Platform", page_icon="🎯", layout="wide")
+st.set_page_config(page_title="YOLOv11 Platform", page_icon="🎯", layout="wide")
 
 
 class ApiError(RuntimeError):
@@ -78,7 +78,7 @@ def folder_picker(key: str) -> str:
     資料夾會提醒使用者。另保留手動貼路徑作為後備（由呼叫頁的 expander 提供）。"""
     picked_key = f"{key}_picked"
     c1, c2 = st.columns([1, 4])
-    if c1.button("📂 選擇資料夾…", key=f"{key}_browse", use_container_width=True):
+    if c1.button("📂 選擇資料夾…", key=f"{key}_browse", width="stretch"):
         with st.spinner("已開啟選擇視窗，請在彈出的視窗中選擇資料夾…"):
             try:
                 res = api_post("/api/fs/pick_folder")
@@ -107,7 +107,7 @@ def folder_picker(key: str) -> str:
 
 # ---------- 側邊欄 ----------
 
-st.sidebar.title("🎯 YOLO Platform")
+st.sidebar.title("🎯 YOLOv11 Platform")
 page = st.sidebar.radio("功能", ["📁 資料集管理", "🏋️ 模型訓練", "📈 訓練監控", "🔍 推論測試", "📦 模型庫"])
 
 try:
@@ -125,8 +125,11 @@ else:
 
 try:
     su = api_get("/api/storage")
+    st.sidebar.markdown("**💾 磁碟空間**")
+    st.sidebar.progress(min(su["disk_used_pct"] / 100, 1.0))
     st.sidebar.caption(
-        f"💾 磁碟用量\n\n"
+        f"已用 {su['disk_used_pct']:.0f}%｜剩餘 {su['disk_free_gb']:.0f} GB / 共 {su['disk_total_gb']:.0f} GB\n\n"
+        f"本平台占用：\n"
         f"- 訓練成果 runs：{su['runs_mb']:.0f} MB\n"
         f"- 資料集 datasets：{su['datasets_mb']:.0f} MB\n"
         f"- need_to_train：{su['need_to_train_mb']:.0f} MB")
@@ -194,7 +197,7 @@ if page == "📁 資料集管理":
     st.subheader("現有資料集")
     ds = api_get("/api/datasets")
     if ds:
-        st.dataframe(pd.DataFrame(ds)[["name", "nc", "classes", "split"]], use_container_width=True)
+        st.dataframe(pd.DataFrame(ds)[["name", "nc", "classes", "split"]], width="stretch")
         with st.expander("🗑️ 刪除資料集"):
             st.caption("只會刪除平台的資料集註冊，不會動到你的來源影像資料夾。")
             target = st.selectbox("選擇要刪除的資料集", [d["name"] for d in ds], key="ds_del_sel")
@@ -340,6 +343,32 @@ elif page == "📈 訓練監控":
     with col3:
         auto = st.checkbox("自動更新（每 5 秒）", value=is_active)
 
+    with st.expander("🗑️ 刪除任務紀錄"):
+        st.caption("刪除會一併移除該任務的訓練成果與權重（runs/ 內）。進行中的任務請先取消。")
+        if is_active:
+            st.info("此任務進行中，無法刪除。")
+        else:
+            confirm = st.checkbox(f"我確定要刪除「{task['id']}」（含權重，無法復原）",
+                                  key=f"task_del_{task['id']}")
+            if st.button("刪除此任務", disabled=not confirm):
+                try:
+                    api_delete(f"/api/train/{task['id']}")
+                    st.success(f"已刪除任務「{task['id']}」")
+                    st.rerun()
+                except RuntimeError as e:
+                    st.error(str(e))
+
+        failed_ids = [t["id"] for t in tasks if t["status"] == "failed"]
+        if failed_ids:
+            if st.button(f"🧹 清除所有失敗的任務（{len(failed_ids)} 筆）"):
+                for fid in failed_ids:
+                    try:
+                        api_delete(f"/api/train/{fid}")
+                    except RuntimeError:
+                        pass
+                st.success(f"已清除 {len(failed_ids)} 筆失敗任務")
+                st.rerun()
+
     c1, c2, c3 = st.columns(3)
     c1.metric("狀態", task["status"])
     c2.metric("進度", f"{task['epoch']} / {task['total_epochs']} epochs")
@@ -402,7 +431,7 @@ elif page == "📈 訓練監控":
             g2.subheader("Loss")
             g2.line_chart(df[loss_cols])
         with st.expander("完整指標表"):
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df, width="stretch")
 
     if task["status"] in ("completed", "cancelled") and task["run_dir"]:
         prefix = "訓練完成！" if task["status"] == "completed" else "已取消（保留已訓練的權重）"
@@ -457,15 +486,15 @@ elif page == "🔍 推論測試":
         n = len(images)
 
         b1, b2, b3, b4, b5 = st.columns(5)
-        if b1.button("⬅️ 上一張", use_container_width=True):
+        if b1.button("⬅️ 上一張", width="stretch"):
             st.session_state.inf_idx = (idx - 1) % n
             st.rerun()
-        if b2.button("下一張 ➡️", use_container_width=True):
+        if b2.button("下一張 ➡️", width="stretch"):
             st.session_state.inf_idx = (idx + 1) % n
             st.rerun()
-        run_clicked = b3.button("🔍 推論", type="primary", use_container_width=True)
-        run_all_clicked = b4.button("🔍🔍 推論全部", use_container_width=True)
-        mark_clicked = b5.button("📋 複製到 need_to_train", use_container_width=True)
+        run_clicked = b3.button("🔍 推論", type="primary", width="stretch")
+        run_all_clicked = b4.button("🔍🔍 推論全部", width="stretch")
+        mark_clicked = b5.button("📋 複製到 need_to_train", width="stretch")
 
         idx = st.session_state.inf_idx
         current = images[idx]
@@ -509,14 +538,14 @@ elif page == "🔍 推論測試":
 
         left, right = st.columns(2)
         with left:
-            st.image(current, caption="原始影像", use_container_width=True)
+            st.image(current, caption="原始影像", width="stretch")
         with right:
             result = st.session_state.inf_results.get(current)
             if result:
                 st.image(base64.b64decode(result["annotated_image_b64"]),
-                         caption=f"偵測結果（{result['count']} 個物件）", use_container_width=True)
+                         caption=f"偵測結果（{result['count']} 個物件）", width="stretch")
                 if result["detections"]:
-                    st.dataframe(pd.DataFrame(result["detections"]), use_container_width=True)
+                    st.dataframe(pd.DataFrame(result["detections"]), width="stretch")
                 else:
                     st.info("未偵測到任何物件，可嘗試降低信心閾值")
             else:
@@ -529,7 +558,7 @@ elif page == "🔍 推論測試":
                          "物件數": r["count"],
                          "最高信心": max((d["confidence"] for d in r["detections"]), default=None)}
                         for p, r in done.items()]
-                st.dataframe(pd.DataFrame(rows), use_container_width=True)
+                st.dataframe(pd.DataFrame(rows), width="stretch")
 
 
 # ---------- 模型庫 ----------
@@ -550,7 +579,7 @@ elif page == "📦 模型庫":
                 "判讀": map_verdict(map50).split("｜")[0] if map50 is not None else "—",
                 **metrics,
             })
-        st.dataframe(pd.DataFrame(rows), use_container_width=True)
+        st.dataframe(pd.DataFrame(rows), width="stretch")
         st.caption("判讀燈號：🟢 表現良好（mAP50>0.7）／🟡 尚可（0.3–0.7）／🔴 偏低（<0.3）")
     else:
         st.info("尚無已訓練模型")
@@ -560,7 +589,7 @@ elif page == "📦 模型庫":
         if runs:
             st.dataframe(pd.DataFrame([{"名稱": r["name"], "大小(MB)": r["size_mb"],
                                         "有權重": "✓" if r["has_weights"] else ""} for r in runs]),
-                         use_container_width=True)
+                         width="stretch")
             target = st.selectbox("選擇要刪除的訓練成果", [r["name"] for r in runs], key="run_del_sel")
             confirm = st.checkbox(f"我確定要刪除「{target}」（含權重與圖表，無法復原）", key="run_del_confirm")
             if st.button("刪除訓練成果", disabled=not confirm):
@@ -578,7 +607,7 @@ elif page == "📦 模型庫":
         st.caption(f"目前 {ntt['count']} 張影像，共 {ntt['total_mb']:.1f} MB")
         if ntt["files"]:
             st.dataframe(pd.DataFrame(ntt["files"]).rename(
-                columns={"name": "檔名", "size_mb": "大小(MB)"}), use_container_width=True)
+                columns={"name": "檔名", "size_mb": "大小(MB)"}), width="stretch")
 
             st.markdown("**自選刪除**")
             chosen = st.multiselect("選擇要刪除的影像（可多選）",
@@ -607,11 +636,11 @@ elif page == "📦 模型庫":
     st.subheader("YOLOv26 模型（擴充區）")
     yolov26 = [m for m in models if m["type"] == "yolov26"]
     if yolov26:
-        st.dataframe(pd.DataFrame(yolov26)[["id", "label"]], use_container_width=True)
+        st.dataframe(pd.DataFrame(yolov26)[["id", "label"]], width="stretch")
     else:
         st.caption("YOLOv26 為 Ultralytics 官方後續版本。發布後升級 ultralytics 套件，"
                    "將 yolo26*.pt 權重（或 .yaml 架構設定）放入 `models/YOLOV26/` 即會自動出現在此處與各模型選單")
 
     st.subheader("官方預訓練")
     st.dataframe(pd.DataFrame([m for m in models if m["type"] == "pretrained"])[["id", "label"]],
-                 use_container_width=True)
+                 width="stretch")

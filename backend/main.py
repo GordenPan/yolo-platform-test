@@ -161,6 +161,18 @@ def cancel_train(task_id: str):
     return {"status": "cancelling"}
 
 
+@app.delete("/api/train/{task_id}")
+def delete_train_task(task_id: str):
+    """刪除一筆訓練任務紀錄（含其 run 資料夾與權重）。進行中的需先取消。"""
+    if trainer.get_task(task_id) is None:
+        raise HTTPException(status_code=404, detail="找不到任務")
+    try:
+        trainer.delete_task(task_id)
+        return {"deleted": task_id}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.post("/api/train/{task_id}/resume", response_model=TrainResponse)
 def resume_train(task_id: str):
     """從中斷／取消／失敗的任務的 last.pt 續訓，繼續到原定 epochs。"""
@@ -372,9 +384,15 @@ def clear_need_to_train(name: str = ""):
 
 @app.get("/api/storage")
 def storage_usage():
-    """各資料區的磁碟用量（MB），供側邊欄顯示。"""
+    """各資料區的磁碟用量（MB）+ 所在磁碟的總量/剩餘/使用率，供側邊欄顯示。"""
+    usage = shutil.disk_usage(str(RUNS_DIR))
     return {
         "datasets_mb": mb(dir_size(DATASETS_DIR)),
         "runs_mb": mb(dir_size(RUNS_DIR)),
         "need_to_train_mb": mb(dir_size(NEED_TO_TRAIN_DIR)),
+        "disk_total_gb": round(usage.total / 1024**3, 1),
+        "disk_free_gb": round(usage.free / 1024**3, 1),
+        "disk_used_gb": round(usage.used / 1024**3, 1),
+        "disk_used_pct": round(usage.used / usage.total * 100, 1),
+        "disk_free_pct": round(usage.free / usage.total * 100, 1),
     }
