@@ -18,6 +18,7 @@ from pathlib import Path
 import yaml
 
 from ..core.config import DATASETS_DIR
+from .fsutil import safe_child
 
 IMG_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".webp", ".tif", ".tiff"}
 
@@ -62,6 +63,7 @@ def register_folder(
     split: str = "auto",
     val_ratio: float = 0.2,
     class_names: list[str] | None = None,
+    overwrite: bool = False,
 ) -> dict:
     """註冊本機資料夾為資料集（不複製影像，data.yaml 直接指向原始資料夾）。
 
@@ -69,6 +71,9 @@ def register_folder(
       - 含 data.yaml 的標準格式資料夾 -> 直接沿用其設定
       - 含 images/ + labels/ 的資料夾 -> 依切分選項產生 data.yaml
       - 直接指向 images 資料夾（旁邊有 labels/）-> 自動以上層為根目錄
+
+    若同名資料集已存在（且非就地註冊），需 overwrite=True 才會覆蓋，
+    否則 raise FileExistsError（由 API 轉成 409 讓前端確認）。
     """
     src = Path(folder).resolve()
     if not src.is_dir():
@@ -83,6 +88,8 @@ def register_folder(
     if target.exists() and not in_place:
         if src == target.resolve() or src in target.resolve().parents or target.resolve() in src.parents:
             raise ValueError(f"來源資料夾與資料集目錄重疊，無法註冊: {src}")
+        if not overwrite:
+            raise FileExistsError(safe)
         shutil.rmtree(target)
     target.mkdir(parents=True, exist_ok=True)
 
@@ -167,6 +174,14 @@ def resolve_dataset(name: str) -> str:
     if yaml_path is None:
         raise FileNotFoundError(f"找不到資料集: {name}")
     return str(yaml_path)
+
+
+def delete_dataset(name: str) -> None:
+    """刪除資料集註冊（只刪 datasets/<name>，絕不碰使用者的來源影像資料夾）。"""
+    target = safe_child(DATASETS_DIR, name)
+    if not target.is_dir():
+        raise FileNotFoundError(f"找不到資料集: {name}")
+    shutil.rmtree(target)
 
 
 def _generate_data_yaml(

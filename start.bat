@@ -35,7 +35,7 @@ echo Backend is ready.
 
 :frontend
 echo [2/2] Starting frontend UI on port 8501 (browser opens automatically) ...
-start "YOLO Platform - Frontend" cmd /k "cd /d "%~dp0" && python -m streamlit run frontend/app.py --server.port 8501"
+start "YOLO Platform - Frontend" cmd /k "cd /d "%~dp0" && python -m streamlit run frontend/app.py --server.port 8501 --server.address 127.0.0.1"
 
 echo.
 echo Done:

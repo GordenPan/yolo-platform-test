@@ -9,8 +9,8 @@ class TrainRequest(BaseModel):
     dataset: str = Field(..., description="資料集名稱（datasets/ 下的資料夾名）")
     name: str | None = Field(None, description="run 名稱；留空用時間戳")
     epochs: int = Field(50, ge=1, le=10000)
-    imgsz: int = Field(640, ge=32)
-    batch: int = Field(16, ge=1)
+    imgsz: int = Field(640, ge=100, le=10000, description="影像尺寸；ultralytics 會自動對齊 32 的倍數")
+    batch: int = Field(16, ge=-1, description="批次大小；-1=AutoBatch 自動依 GPU 記憶體選擇")
     device: str | None = Field(None, description="留空自動偵測（有 GPU 用 GPU，否則 CPU）")
     # 常用訓練策略（預設值同 ultralytics）
     pretrained: bool = Field(True, description="是否使用預訓練權重")
