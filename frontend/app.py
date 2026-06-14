@@ -4,9 +4,11 @@
 啟動：streamlit run frontend/app.py
 """
 import base64
+import io
 import json
 import os
 import time
+import zipfile
 
 import pandas as pd
 import requests
@@ -50,6 +52,12 @@ def api_delete(path: str, params: dict | None = None):
     r = requests.delete(f"{API}{path}", params=params, timeout=60)
     _raise_for_status(r)
     return r.json()
+
+
+def api_get_bytes(path: str, params: dict | None = None) -> bytes:
+    r = requests.get(f"{API}{path}", params=params, timeout=60)
+    _raise_for_status(r)
+    return r.content
 
 
 def map_verdict(m: float | None) -> str:
@@ -436,6 +444,63 @@ elif page == "📈 訓練監控":
     if task["status"] in ("completed", "cancelled") and task["run_dir"]:
         prefix = "訓練完成！" if task["status"] == "completed" else "已取消（保留已訓練的權重）"
         st.success(f"{prefix}權重位置：`{task['run_dir']}\\weights\\best.pt`")
+
+        # 訓練產出的圖表（混淆矩陣、PR 曲線、總覽、預測樣本）
+        run_name = os.path.basename(task["run_dir"].rstrip("\\/"))
+        try:
+            plots = api_get(f"/api/runs/{run_name}/plots")["plots"]
+        except RuntimeError:
+            plots = []
+        if plots:
+            def caption_for(fn: str) -> str:
+                low = fn.lower()
+                if low == "results.png":
+                    return "訓練總覽（loss / 指標隨 epoch 變化）"
+                if "confusion_matrix_normalized" in low:
+                    return "混淆矩陣（正規化）— 看每個類別的準度"
+                if "confusion_matrix" in low:
+                    return "混淆矩陣"
+                if "pr_curve" in low:
+                    return "Precision-Recall 曲線"
+                if "f1_curve" in low:
+                    return "F1 曲線"
+                if "p_curve" in low:
+                    return "Precision 曲線"
+                if "r_curve" in low:
+                    return "Recall 曲線"
+                if "val_batch" in low and "pred" in low:
+                    return "驗證集預測樣本"
+                if "val_batch" in low:
+                    return "驗證集標註（真實答案）"
+                return fn
+
+            def first_match(*keys):
+                # 依關鍵字找第一個符合的圖檔（跨 ultralytics 版本，如 PR_curve / BoxPR_curve）
+                for p in plots:
+                    if all(k in p.lower() for k in keys):
+                        return p
+                return None
+
+            with st.expander("📊 訓練圖表（混淆矩陣 / PR 曲線 / 預測樣本）", expanded=False):
+                show = [fn for fn in (
+                    "results.png" if "results.png" in plots else None,
+                    first_match("confusion_matrix_normalized"),
+                    first_match("pr_curve"),
+                    first_match("val_batch0", "pred"),
+                ) if fn]
+                cols = st.columns(2)
+                for i, fn in enumerate(show):
+                    try:
+                        img = api_get_bytes(f"/api/runs/{run_name}/file", params={"file": fn})
+                        cols[i % 2].image(img, caption=caption_for(fn), width="stretch")
+                    except RuntimeError:
+                        pass
+                others = [p for p in plots if p not in show]
+                if others:
+                    pick = st.selectbox("查看其他圖表", ["（選擇）"] + others, key="plot_more")
+                    if pick != "（選擇）":
+                        st.image(api_get_bytes(f"/api/runs/{run_name}/file", params={"file": pick}),
+                                 caption=caption_for(pick), width="stretch")
     elif task["status"] == "interrupted":
         st.warning("此任務在後端重啟前還在執行，已標記為中斷。若有產生權重仍可在 runs/ 找到。")
 
@@ -552,6 +617,14 @@ elif page == "🔍 推論測試":
                 st.info("尚未推論，按「🔍 推論」執行")
 
         done = {p: r for p, r in st.session_state.inf_results.items() if p in images}
+        if done:
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                for p, r in done.items():
+                    stem = os.path.splitext(os.path.basename(p))[0]
+                    zf.writestr(f"{stem}_pred.jpg", base64.b64decode(r["annotated_image_b64"]))
+            st.download_button(f"💾 下載標註圖 ZIP（{len(done)} 張）", buf.getvalue(),
+                               file_name="annotated.zip", mime="application/zip")
         if len(done) > 1:
             with st.expander(f"📊 全部結果總覽（已推論 {len(done)} / {n} 張）", expanded=False):
                 rows = [{"檔名": os.path.basename(p),

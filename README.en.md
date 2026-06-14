@@ -1,4 +1,4 @@
-# YOLO Platform — All-in-One YOLO Training & Testing Platform
+# YOLOv11 Platform — All-in-One YOLO Training & Testing Platform
 
 *[繁體中文](README.md) | English*
 
@@ -106,19 +106,23 @@ and can be overridden.
 
 ## Key features
 
-- **Dataset management**: pick a local folder with the built-in folder browser (or paste a path);
-  images are referenced, not copied. Choose auto train/val split or same folder.
+- **Dataset management**: pick a local folder with the native folder dialog (or paste a path);
+  images are referenced, not copied. Choose auto train/val split or same folder; overwriting an
+  existing name asks for confirmation.
 - **Training**: preset modes (Quick / Standard / Fine / Custom) fill the form in one click;
   common hyperparameters are first-class, with advanced JSON pass-through. GPU is auto-detected.
-  AutoBatch (`batch=-1`) avoids out-of-memory crashes.
-- **Monitoring**: live mAP/loss curves and progress bar with a red/yellow/green verdict; shows the
-  parameters used; **cancel anytime** (stops at the next epoch boundary, weights preserved);
-  **resume** cancelled/interrupted/failed runs; records are persisted, so they **survive a backend
-  restart**, and runs copied into `runs/` manually are listed automatically.
+  AutoBatch (`batch=-1`) avoids out-of-memory crashes; only one training runs at a time to protect
+  small GPUs.
+- **Monitoring**: live mAP/loss curves with a red/yellow/green verdict, the parameters used, and
+  **training plots** (confusion matrix / PR curve / prediction samples); **cancel anytime** (stops
+  at the next epoch boundary, weights preserved) and **resume** cancelled/interrupted/failed runs;
+  completion notification; records are persisted, so they **survive a backend restart**, runs copied
+  into `runs/` manually are listed automatically, and tasks can be deleted.
 - **Inference**: folder-browsing mode, single or batch inference; copy hard cases to
-  `need_to_train/` with one click.
+  `need_to_train/` with one click; download annotated images as a ZIP.
 - **Model library / management**: lists trained models with a mAP verdict; delete datasets
-  (without touching your source images), delete runs, clean `need_to_train`; disk usage in the sidebar.
+  (without touching your source images), delete runs, manage `need_to_train`; disk usage and free
+  space in the sidebar.
 
 ## YOLOv26 support
 

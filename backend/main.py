@@ -10,6 +10,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from .core.config import DATASETS_DIR, NEED_TO_TRAIN_DIR, RUNS_DIR
 from .schemas import TrainRequest, TrainResponse
@@ -118,23 +119,26 @@ def start_train(req: TrainRequest):
     except (FileNotFoundError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    task_id = trainer.start_training({
-        "model": req.model,
-        "data": data_yaml,
-        "name": req.name,
-        "epochs": req.epochs,
-        "imgsz": req.imgsz,
-        "batch": req.batch,
-        "device": req.device,
-        "pretrained": req.pretrained,
-        "patience": req.patience,
-        "save_period": req.save_period,
-        "close_mosaic": req.close_mosaic,
-        "degrees": req.degrees,
-        "flipud": req.flipud,
-        "fliplr": req.fliplr,
-        "extra": req.extra,
-    })
+    try:
+        task_id = trainer.start_training({
+            "model": req.model,
+            "data": data_yaml,
+            "name": req.name,
+            "epochs": req.epochs,
+            "imgsz": req.imgsz,
+            "batch": req.batch,
+            "device": req.device,
+            "pretrained": req.pretrained,
+            "patience": req.patience,
+            "save_period": req.save_period,
+            "close_mosaic": req.close_mosaic,
+            "degrees": req.degrees,
+            "flipud": req.flipud,
+            "fliplr": req.fliplr,
+            "extra": req.extra,
+        })
+    except RuntimeError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     return TrainResponse(task_id=task_id)
 
 
@@ -180,6 +184,8 @@ def resume_train(task_id: str):
         return TrainResponse(task_id=trainer.resume_training(task_id))
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -326,6 +332,33 @@ def list_runs():
             "mtime": run.stat().st_mtime,
         })
     return out
+
+
+@app.get("/api/runs/{name}/plots")
+def list_run_plots(name: str):
+    """列出某個 run 資料夾內 ultralytics 產生的圖表/樣本影像檔名。"""
+    try:
+        run = safe_child(RUNS_DIR, name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not run.is_dir():
+        raise HTTPException(status_code=404, detail="找不到訓練成果")
+    plots = [f.name for f in sorted(run.iterdir())
+             if f.is_file() and f.suffix.lower() in (".png", ".jpg", ".jpeg")]
+    return {"plots": plots}
+
+
+@app.get("/api/runs/{name}/file")
+def get_run_file(name: str, file: str):
+    """提供 run 資料夾內的單一圖檔（給前端顯示訓練圖表）。"""
+    try:
+        run = safe_child(RUNS_DIR, name)
+        target = safe_child(run, file)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="找不到檔案")
+    return FileResponse(str(target))
 
 
 @app.delete("/api/runs/{name}")

@@ -93,14 +93,23 @@ def _save_task(task: TrainTask) -> None:
         pass
 
 
+def active_task_id() -> str | None:
+    """回傳目前進行中（pending/running）的任務 id，沒有則 None。"""
+    return next((tid for tid, t in _tasks.items() if t.status in _ACTIVE), None)
+
+
 def start_training(params: dict) -> str:
-    task_id = time.strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
-    task = TrainTask(id=task_id, params=params, total_epochs=int(params["epochs"]))
+    task = TrainTask(id="", params=params, total_epochs=int(params["epochs"]))
     with _lock:
-        _tasks[task_id] = task
+        aid = active_task_id()
+        if aid:
+            raise RuntimeError(f"已有訓練進行中（{aid}）。GPU 一次只跑一個訓練，"
+                               "請等它完成或先到「訓練監控」取消。")
+        task.id = time.strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
+        _tasks[task.id] = task
     _save_task(task)
     threading.Thread(target=_run, args=(task,), daemon=True).start()
-    return task_id
+    return task.id
 
 
 def cancel_task(task_id: str) -> bool:
@@ -122,6 +131,10 @@ def resume_training(task_id: str) -> str:
     old = _tasks.get(task_id)
     if old is None:
         raise FileNotFoundError("找不到任務")
+    aid = active_task_id()
+    if aid:
+        raise RuntimeError(f"已有訓練進行中（{aid}）。GPU 一次只跑一個訓練，"
+                           "請等它完成或先取消。")
     if old.status not in ("cancelled", "interrupted", "failed"):
         raise ValueError("只有已中斷／取消／失敗的任務可以續訓")
     if not old.run_dir:
